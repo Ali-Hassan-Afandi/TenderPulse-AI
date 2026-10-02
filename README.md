@@ -64,3 +64,19 @@ The module opens/queries public PEC web surfaces and returns source links/status
 
 ## Commercial hardening
 Add PostgreSQL/Supabase, persistent object storage, authentication/RBAC, audit logs, background jobs, official/permissioned procurement feeds, OCR, malware scanning, observability, rate limiting, encrypted company-document vault, and legal/security review before production.
+
+
+## Competition build additions
+- Modular 7-agent execution pipeline
+- Local lightweight tender-document retrieval/RAG
+- PEC CAPTCHA-safe human verification workflow
+- Compliance and risk matrix
+- Corrigendum fingerprint/watch architecture
+- Optional Supabase persistence schema
+- DOCX + PDF final intelligence reports
+- SMTP company alerts
+- Pakistan-wide synthetic simulation and yearly progress charts
+- Explicit separation of live public data, AI inference, and simulation
+
+## Supabase (optional)
+Run `supabase_schema.sql` in the Supabase SQL editor, then add `SUPABASE_URL` and `SUPABASE_KEY` to Streamlit Secrets. The app remains functional without Supabase.
