@@ -1,0 +1,88 @@
+[
+  {
+    "id": "DEMO-PUN-001",
+    "title": "District Office Solarization & Electrical Upgrade",
+    "agency": "Demo Provincial Works Department",
+    "province": "Punjab",
+    "category": "Electrical",
+    "deadline": "2026-10-21",
+    "security_m": 1.8,
+    "min_category": "C3",
+    "required_codes": [
+      "EE04"
+    ],
+    "min_turnover_m": 120,
+    "min_experience": 5,
+    "estimated_value_m": 72,
+    "source": "SIMULATION"
+  },
+  {
+    "id": "DEMO-FED-002",
+    "title": "Public Facility Rehabilitation Package",
+    "agency": "Demo Federal Agency",
+    "province": "Federal",
+    "category": "Civil Works",
+    "deadline": "2026-10-27",
+    "security_m": 2.4,
+    "min_category": "C3",
+    "required_codes": [
+      "CE01",
+      "CE10"
+    ],
+    "min_turnover_m": 150,
+    "min_experience": 7,
+    "estimated_value_m": 110,
+    "source": "SIMULATION"
+  },
+  {
+    "id": "DEMO-SIN-003",
+    "title": "Regional Data Centre Electrical Works",
+    "agency": "Demo Sindh Authority",
+    "province": "Sindh",
+    "category": "Electrical",
+    "deadline": "2026-11-03",
+    "security_m": 3.0,
+    "min_category": "C2",
+    "required_codes": [
+      "EE04"
+    ],
+    "min_turnover_m": 220,
+    "min_experience": 8,
+    "estimated_value_m": 145,
+    "source": "SIMULATION"
+  },
+  {
+    "id": "DEMO-KP-004",
+    "title": "Government Buildings Energy Retrofit",
+    "agency": "Demo KP Department",
+    "province": "Khyber Pakhtunkhwa",
+    "category": "Energy",
+    "deadline": "2026-11-09",
+    "security_m": 1.2,
+    "min_category": "C4",
+    "required_codes": [
+      "EE04"
+    ],
+    "min_turnover_m": 80,
+    "min_experience": 4,
+    "estimated_value_m": 54,
+    "source": "SIMULATION"
+  },
+  {
+    "id": "DEMO-BAL-005",
+    "title": "Administrative Complex Civil Improvements",
+    "agency": "Demo Balochistan Department",
+    "province": "Balochistan",
+    "category": "Civil Works",
+    "deadline": "2026-11-16",
+    "security_m": 1.5,
+    "min_category": "C4",
+    "required_codes": [
+      "CE01"
+    ],
+    "min_turnover_m": 90,
+    "min_experience": 5,
+    "estimated_value_m": 61,
+    "source": "SIMULATION"
+  }
+]
