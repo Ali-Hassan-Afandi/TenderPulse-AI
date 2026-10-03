@@ -14,6 +14,7 @@ from src.agents.pipeline import run_all
 from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent
 from src.reporting.report_builder import build_docx,build_pdf
 from src.simulation import national_simulation,yearly_company_demo
+from src.services.profile_analytics import completeness,yearly_progress,seven_day_matches
 
 st.set_page_config(page_title="TenderPulse AI",page_icon="⚡",layout="wide")
 inject_v3_css();hero()
@@ -49,26 +50,49 @@ if page=="🏠 Command Center":
         cols[0].markdown(f"**{(date.today()+timedelta(days=i)).strftime('%d %b')}**")
         with cols[1]:tender_card(t)
         cols[2].metric("Fit",f"{t['match']['fit']}%")
+    st.markdown("### Company Progress")
+    p1,p2=st.columns([1,2])
+    p1.metric("Profile completeness",f"{completeness(company)}%")
+    p1.progress(completeness(company)/100)
+    yp=yearly_progress(company)
+    p2.plotly_chart(px.line(yp,x="Year",y=["Capability Index","Turnover Index","Project Index"],markers=True,title="5-Year Company Improvement — SIMULATION"),use_container_width=True)
+    st.markdown("### Last 7 Days — Matching Tender Trend")
+    sd=seven_day_matches()
+    st.plotly_chart(px.bar(sd,x="Date",y="Matches",color="Category",barmode="group",title="Matched tenders by procurement category — SIMULATION"),use_container_width=True)
     st.markdown("### National simulation")
     nat=national_simulation();st.plotly_chart(px.bar(nat,x="Region",y=["Simulated opportunities","Matched"],barmode="group"),use_container_width=True)
     if st.button("Next → Build Company Profile",type="primary",use_container_width=True):go("🏢 Company Profile")
 
 elif page=="🏢 Company Profile":
     st.subheader("Company Digital Twin")
-    mode=st.radio("Profile type",["Test Company (pre-filled)","Real Company"],horizontal=True)
+    mode=st.radio("Profile type",["Test Company (pre-filled)","Real Company"],horizontal=True,key="profile_type_mode")
     if mode.startswith("Test") and st.button("Load Test C3 Company"):st.session_state.company=load("demo_company.json");st.rerun()
     d=st.session_state.company;codes_catalog=load("pec_codes.json")
     certs_all=["PEC Constructor Registration","NTN/FBR Registration","GST Registration","PRA Registration","SRB Registration","KPRA Registration","BRA Registration","SECP Registration","ISO 9001","ISO 14001","ISO 45001","Bank/Financial Certificate","Active Taxpayer Evidence","Other"]
-    with st.form("company"):
-        a,b=st.columns(2);name=a.text_input("Company name",d.get("company_name","") if mode.startswith("Test") else "");email=b.text_input("Tender alert email",d.get("email","") if mode.startswith("Test") else "")
-        a,b,c=st.columns(3);lic=a.text_input("PEC registration no.",d.get("pec_license","") if mode.startswith("Test") else "");cat=b.selectbox("PEC category",["C-A","C-B","C1","C2","C3","C4","C5","C6"],index=4);province=c.selectbox("Home region",["Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan","Federal","AJK","Gilgit-Baltistan"])
-        codes=st.multiselect("PEC specialization codes",list(codes_catalog),default=[x for x in d.get("pec_codes",[]) if x in codes_catalog],format_func=lambda x:f"{x} — {codes_catalog[x]}")
-        certs=st.multiselect("Available registrations / certificates",certs_all,default=[x for x in d.get("certifications",[]) if x in certs_all])
-        sectors=st.multiselect("Business sectors",["Civil Works","Roads","Buildings","Bridges","Water/Irrigation","Electrical","Solar","Mechanical","IT","Goods/Supplies","Consultancy"],default=[x for x in d.get("sectors",[]) if x in ["Civil Works","Roads","Buildings","Bridges","Water/Irrigation","Electrical","Solar","Mechanical","IT","Goods/Supplies","Consultancy"]])
-        kw=st.text_input("Capability keywords",", ".join(d.get("keywords",[])));a,b=st.columns(2);exp=a.number_input("Experience years",0,80,int(d.get("years_experience",0)));turn=b.number_input("Annual turnover PKR million",0.0,1000000.0,float(d.get("annual_turnover_m",0)))
-        if st.form_submit_button("Save Company Profile",type="primary"):
+    with st.form("company_profile_form",clear_on_submit=False):
+        a,b=st.columns(2)
+        name=a.text_input("Company name",d.get("company_name","") if mode.startswith("Test") else "",key="company_name_input")
+        email=b.text_input("Tender alert email",d.get("email","") if mode.startswith("Test") else "",key="company_email_input")
+        a,b,c=st.columns(3)
+        lic=a.text_input("PEC registration no.",d.get("pec_license","") if mode.startswith("Test") else "",key="pec_license_input")
+        _cats=["C-A","C-B","C1","C2","C3","C4","C5","C6"]; _cat=d.get("pec_category","C3")
+        cat=b.selectbox("PEC category",_cats,index=_cats.index(_cat) if _cat in _cats else 4,key="pec_category_input")
+        _regions=["Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan","Federal","AJK","Gilgit-Baltistan"]; _reg=d.get("province","Punjab")
+        province=c.selectbox("Home region",_regions,index=_regions.index(_reg) if _reg in _regions else 0,key="home_region_input")
+        codes=st.multiselect("PEC specialization codes — searchable official catalog",list(codes_catalog),default=[x for x in d.get("pec_codes",[]) if x in codes_catalog],format_func=lambda x:f"{x} — {codes_catalog[x]}",key="pec_codes_input",help="Search by code or description. Verify final firm codes on PEC.")
+        certs=st.multiselect("Available registrations / certificates",certs_all,default=[x for x in d.get("certifications",[]) if x in certs_all],key="certificates_input")
+        sectors=st.multiselect("Business sectors",["Civil Works","Roads","Buildings","Bridges","Water/Irrigation","Electrical","Solar","Mechanical","IT","Goods/Supplies","Consultancy"],default=[x for x in d.get("sectors",[]) if x in ["Civil Works","Roads","Buildings","Bridges","Water/Irrigation","Electrical","Solar","Mechanical","IT","Goods/Supplies","Consultancy"]],key="sectors_input")
+        kw=st.text_input("Capability keywords",", ".join(d.get("keywords",[])),key="capability_keywords_input")
+        a,b=st.columns(2)
+        exp=a.number_input("Experience years",0,80,int(d.get("years_experience",0)),key="experience_input")
+        turn=b.number_input("Annual turnover PKR million",0.0,1000000.0,float(d.get("annual_turnover_m",0)),key="turnover_input")
+        if st.form_submit_button("Save Company Profile",type="primary",use_container_width=True):
             st.session_state.company={"mode":"TEST" if mode.startswith("Test") else "REAL","company_name":name,"email":email,"pec_license":lic,"pec_category":cat,"pec_codes":codes,"province":province,"certifications":certs,"sectors":sectors,"keywords":[x.strip() for x in kw.split(",") if x.strip()],"years_experience":exp,"annual_turnover_m":turn}
             r=save_company(st.session_state.company);st.success("Saved to Supabase." if r.get("ok") else "Saved in session; inspect Supabase connection.")
+    st.markdown("### Profile Progress")
+    _pc=completeness(st.session_state.company)
+    st.progress(_pc/100,text=f"{_pc}% company profile complete")
+    st.caption("A richer verified profile improves tender filtering: PEC codes, certificates, sectors, experience and turnover all matter.")
     st.link_button("Verify on official PEC","https://verification.pec.org.pk/")
     if st.button("Next → Search Matching Tenders",type="primary",use_container_width=True):go("📡 Tender Radar")
 
