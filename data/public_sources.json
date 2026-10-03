@@ -1,0 +1,37 @@
+{
+  "Federal": {
+    "name": "Federal PPRA / EPADS",
+    "url": "https://epms.ppra.gov.pk/public/tenders/active-tenders",
+    "live_parser": true
+  },
+  "Punjab": {
+    "name": "Punjab PPRA",
+    "url": "https://ppra.punjab.gov.pk/public_procurement",
+    "live_parser": false
+  },
+  "Sindh": {
+    "name": "Sindh SPPRA / PPMS",
+    "url": "https://www.e.pprasindh.gov.pk/",
+    "live_parser": false
+  },
+  "Khyber Pakhtunkhwa": {
+    "name": "KP PPRA",
+    "url": "https://kppra.gov.pk/",
+    "live_parser": false
+  },
+  "Balochistan": {
+    "name": "Balochistan PPRA",
+    "url": "https://bppra.gob.pk/",
+    "live_parser": false
+  },
+  "AJK": {
+    "name": "AJ&K PPRA",
+    "url": "https://www.ajkppra.gov.pk/",
+    "live_parser": true
+  },
+  "Gilgit-Baltistan": {
+    "name": "GB PPRA",
+    "url": "https://gbppra.gov.pk/",
+    "live_parser": true
+  }
+}

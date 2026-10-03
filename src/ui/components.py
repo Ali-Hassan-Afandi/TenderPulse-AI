@@ -23,4 +23,11 @@ def inject_v3_css():
     .tp-badge{font-size:.76rem;padding:5px 9px;border-radius:20px;background:rgba(92,130,255,.14)}
     .tp-fit{font-weight:800;font-size:1.08rem;color:#65f6ae}.tp-meta,.tp-reason{font-size:.84rem;color:#aeb8c6;margin-top:8px}
     div[data-testid="stMetric"]{background:rgba(18,27,39,.72);border:1px solid rgba(255,255,255,.08);padding:12px;border-radius:16px}
-    </style>""",unsafe_allow_html=True)
+     .tp-card-link{text-decoration:none!important;color:inherit!important}.tp-card{transition:.18s ease}.tp-card:hover{transform:translateY(-3px);border-color:rgba(101,246,174,.65);box-shadow:0 18px 40px rgba(0,0,0,.28)}.tp-open{margin-top:12px;color:#65f6ae;font-weight:700} </style>""",unsafe_allow_html=True)
+
+def progress_header(step,total,label):
+    import streamlit as st
+    st.progress(step/total,text=f"Step {step} of {total} — {label}")
+def next_button(label,key):
+    import streamlit as st
+    return st.button(f"Next → {label}",key=key,type="primary",use_container_width=True)
