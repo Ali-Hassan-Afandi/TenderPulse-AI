@@ -47,3 +47,20 @@ def save_match(company,tender,score,details):
     return insert("matches",{"company_name":company.get("company_name"),"tender_id":tender.get("id"),"fit_score":score,"details":details})
 def save_analysis(tid,name,result):return insert("analyses",{"tender_id":tid,"company_name":name,"result":result})
 def save_alert(tid,recipient,status):return insert("alerts",{"tender_id":tid,"recipient":recipient,"status":status})
+
+def list_companies(limit=100):
+    return recent("companies",limit)
+def list_tenders(limit=500):
+    if not configured(): return []
+    try:
+        r=requests.get(_u("tenders")+f"?select=*&order=id.desc&limit={limit}",headers=_h(),timeout=25)
+        return r.json() if r.ok else []
+    except:return []
+def log_sync(source,status,records,error=None):
+    return insert("source_sync_runs",{"source":source,"status":status,"records":records,"error":error})
+def tender_exists_fingerprint(fp):
+    if not configured():return False
+    try:
+        r=requests.get(_u("tenders")+f"?select=id&fingerprint=eq.{fp}&limit=1",headers=_h(),timeout=15)
+        return r.ok and bool(r.json())
+    except:return False

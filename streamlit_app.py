@@ -7,11 +7,12 @@ from src.config import DATA_DIR
 from src.ui.components import hero,inject_v3_css,progress_header
 from src.ui.cards import tender_card
 from src.services.live_discovery import discover,source_registry
+from src.connectors.registry import fetch_all
 from src.services.matcher import top_matches
 from src.services.document_service import extract_text
 from src.services.email_service import send_alert
 from src.agents.pipeline import run_all
-from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent
+from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent,list_tenders
 from src.reporting.report_builder import build_docx,build_pdf
 from src.simulation import national_simulation,yearly_company_demo
 from src.services.profile_analytics import completeness,yearly_progress,seven_day_matches
@@ -98,6 +99,11 @@ elif page=="🏢 Company Profile":
 
 elif page=="📡 Tender Radar":
     st.subheader("Pakistan Public Tender Radar")
+    st.caption("LIVE PUBLIC = parsed from official public source. Cached records come from the scheduled cloud sync. No synthetic provincial tender is presented as live.")
+    with st.expander("Connector health / last cloud sync"):
+        sync_rows=recent("source_sync_runs",20)
+        if sync_rows: st.dataframe(pd.DataFrame(sync_rows),use_container_width=True,hide_index=True)
+        else: st.info("No scheduled sync history yet. Run the GitHub Actions TenderPulse Public Tender Sync workflow once.")
     regions=st.multiselect("Search jurisdictions",["Federal","Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan","AJK","Gilgit-Baltistan"],default=["Federal"])
     categories=st.multiselect("Procurement category",["Works","Goods","Non-Consultancy Services","Consultancy Services","Other"],default=["Works","Goods","Non-Consultancy Services","Consultancy Services"])
     procedures=st.multiselect("Procurement procedure",["SS1E","SS2E","Other/Unspecified"],default=["SS1E","SS2E","Other/Unspecified"],help="SS1E = Single Stage–One Envelope; SS2E = Single Stage–Two Envelope.")
@@ -106,16 +112,20 @@ elif page=="📡 Tender Radar":
     with st.expander("Official procurement sources"):
         for r in regions:st.link_button(f"Open {r} official source ↗",registry[r])
     if st.button("🔎 Search Open Sources & Match Company",type="primary"):
-        live_regions=[r for r in regions if r in ["Federal","AJK","Gilgit-Baltistan"]]
-        with st.spinner("Reading supported public sources…"):found=discover(live_regions,pages)
-        # clearly-labelled simulation fallback for connectors not yet normalized
-        unsupported=[r for r in regions if r not in live_regions]
-        if unsupported:
-            demo=load("demo_tenders.json")
-            for region in unsupported:
-                for i,x in enumerate(demo[:5]):
-                    found.append({**x,"id":f"SIM-{region[:3].upper()}-{i+1}","scope":"Provincial","province":region,"status":"SIMULATION","source":registry[region],"source_url":registry[region],"category":x.get("category","Works"),"procedure":x.get("procedure","Other/Unspecified")})
-            st.warning("Simulation fallback used for: "+", ".join(unsupported)+". Official source buttons are provided; these records are not represented as live.")
+        with st.spinner("Reading selected public procurement sources…"):
+            found,source_health=fetch_all(regions)
+        st.session_state.source_health=source_health
+        for _r,_h in source_health.items():
+            if not _h.get("ok"): st.warning(f"{_r}: connector error — {_h.get('error','unknown')}")
+            elif _h.get("records",0)==0: st.info(f"{_r}: public source responded, but no normalized tender records were found in this run.")
+        # If the scheduled cloud worker has already populated Supabase, merge cached live records.
+        cached=[]
+        for row in list_tenders(500):
+            t=row.get("payload") or row
+            if t.get("province") in regions or (t.get("scope")=="Federal" and "Federal" in regions):cached.append(t)
+        byfp={}
+        for t in found+cached:byfp[t.get("fingerprint") or t.get("id")]=t
+        found=list(byfp.values())
         matches=top_matches(st.session_state.company,found,minfit,topn,categories,procedures);st.session_state.matches=matches
         for t in matches:save_tender(t);save_match(st.session_state.company,t,t["match"]["fit"],t["match"])
         st.success(f"{len(found)} normalized records scanned → {len(matches)} company matches.")
