@@ -35,6 +35,11 @@ with st.sidebar:
     step=PAGES.index(page)+1;progress_header(step,len(PAGES),page.split(" ",1)[1])
     h=health();st.caption(("🟢" if h.get("ok") else "🔴")+" Supabase "+h.get("status",""))
     st.caption("Fit = evidence alignment, not award probability.")
+    with st.expander("System Status"):
+        st.write("Groq:", "🟢 configured" if __import__("src.services.groq_service",fromlist=["available"]).available() else "🟠 not configured")
+        _db=health()
+        st.write("Supabase:", "🟢 connected" if _db.get("ok") else "🔴 "+str(_db.get("status")))
+        st.caption("TenderPulse V6.2")
 
 def go(p):
     st.session_state.page=p;st.rerun()

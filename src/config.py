@@ -1,15 +1,18 @@
-from pathlib import Path
 import os
-import streamlit as st
+from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = ROOT / "data"
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
 
 def secret(name, default=None):
-    value=os.environ.get(name)
-    if value is not None and value!="": return value
+    """Read from environment first (workers), then Streamlit secrets (app)."""
+    value = os.environ.get(name)
+    if value not in (None, ""):
+        return value
     try:
         import streamlit as st
-        return st.secrets.get(name,default)
+        return st.secrets.get(name, default)
     except Exception:
         return default
+
+GROQ_MODEL = secret("GROQ_MODEL", "llama-3.3-70b-versatile")
