@@ -43,7 +43,7 @@ with st.sidebar:
         st.write("Groq:", "🟢 configured" if __import__("src.services.groq_service",fromlist=["available"]).available() else "🟠 not configured")
         _db=health()
         st.write("Supabase:", "🟢 connected" if _db.get("ok") else "🔴 "+str(_db.get("status")))
-        st.caption("TenderPulse V6.2")
+        st.caption("TenderPulse V7.1")
 
 def go(p):
     st.session_state.page=p;st.rerun()
@@ -65,7 +65,20 @@ if page=="🏠 Command Center":
     p1.metric("Profile completeness",f"{completeness(company)}%")
     p1.progress(completeness(company)/100)
     yp=yearly_progress(company)
-    p2.plotly_chart(px.line(yp,x="Year",y=["Capability Index","Turnover Index","Project Index"],markers=True,title="5-Year Company Improvement — SIMULATION"),use_container_width=True)
+    _progress_cols=[c for c in ["Capability Index","Turnover PKR m","Projects"] if c in yp.columns]
+    if _progress_cols:
+        p2.plotly_chart(
+            px.line(
+                yp,
+                x="Year",
+                y=_progress_cols,
+                markers=True,
+                title=f"5-Year Company Progress — {company.get('company_name','Selected Company')}",
+            ),
+            use_container_width=True,
+        )
+    else:
+        p2.info("Company progress data is not available yet.")
     st.markdown("### Last 7 Days — Matching Tender Trend")
     _history=company_matches(company.get("company_name"),500)
     sd=seven_day_real(_history)

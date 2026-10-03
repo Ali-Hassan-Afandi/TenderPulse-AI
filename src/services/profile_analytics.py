@@ -8,9 +8,13 @@ def yearly_progress(c):
     years=list(range(date.today().year-4,date.today().year+1))
     cat={"C-A":95,"C-B":90,"C1":85,"C2":78,"C3":70,"C4":60,"C5":50,"C6":40}.get(c.get("pec_category"),45)
     capability=[max(15,min(100,cat-24+i*6+min(exp,15)//3)) for i in range(5)]
-    return pd.DataFrame({"Year":years,"Capability Index":capability,
+    df=pd.DataFrame({"Year":years,"Capability Index":capability,
       "Turnover PKR m":[round(max(1,turn*(.52+i*.12)),1) for i in range(5)],
       "Projects":[round(max(1,projects*(.48+i*.13))) for i in range(5)]})
+    # Compatibility aliases for older deployed dashboard fragments.
+    df["Turnover Index"]=df["Turnover PKR m"]
+    df["Project Index"]=df["Projects"]
+    return df
 def seven_day_real(matches):
     cats=["Works","Goods","Consultancy Services","Non-Consultancy Services","Other"]
     days=[date.today()-timedelta(days=i) for i in range(6,-1,-1)]
