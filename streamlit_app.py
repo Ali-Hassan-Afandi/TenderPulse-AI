@@ -13,7 +13,8 @@ from src.services.matcher import top_matches
 from src.services.document_service import extract_text
 from src.services.email_service import send_alert
 from src.agents.pipeline import run_all
-from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent,list_tenders,saved_companies,save_or_update_company,company_matches
+from src.agents.trace_pipeline import run_with_trace
+from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent,list_tenders,saved_companies,save_or_update_company,company_matches,selectable_companies
 from src.reporting.report_builder import build_docx,build_pdf
 from src.simulation import national_simulation,yearly_company_demo
 from src.services.profile_analytics import completeness,yearly_progress,seven_day_real
@@ -39,12 +40,31 @@ with st.sidebar:
     step=PAGES.index(page)+1;progress_header(step,len(PAGES),page.split(" ",1)[1])
     h=health();st.caption(("🟢" if h.get("ok") else "🔴")+" Supabase "+h.get("status",""))
     st.caption("Fit = evidence alignment, not award probability.")
+    st.markdown("#### Active Company")
+    _available_companies=selectable_companies() if health().get("ok") else []
+    if not _available_companies:
+        _available_companies=_sample_companies
+    _names=[x.get("company_name","Unnamed company") for x in _available_companies]
+    _current=st.session_state.company.get("company_name","")
+    _idx=_names.index(_current) if _current in _names else 0
+    _chosen=st.selectbox("Previously saved companies",_names,index=_idx,key="active_company_selector")
+    _profile=next((x for x in _available_companies if x.get("company_name")==_chosen),_available_companies[0])
+    if _profile.get("company_name") != st.session_state.company.get("company_name"):
+        st.session_state.company=_profile
+        st.session_state.matches=[]
+        st.session_state.selected_tender=None
+        st.session_state.pop("result",None)
+        st.session_state.pop("agent_trace",None)
+        st.rerun()
+    st.session_state.active_company=st.session_state.company
+    st.caption(f"Watching: {st.session_state.company.get('pec_category','—')} • {st.session_state.company.get('province','—')}")
     with st.expander("System Status"):
         st.write("Groq:", "🟢 configured" if __import__("src.services.groq_service",fromlist=["available"]).available() else "🟠 not configured")
         _db=health()
         st.write("Supabase:", "🟢 connected" if _db.get("ok") else "🔴 "+str(_db.get("status")))
-        st.caption("TenderPulse V7.1")
+        st.caption("TenderPulse V8 Functional")
 
+company=st.session_state.company
 def go(p):
     st.session_state.page=p;st.rerun()
 
@@ -113,7 +133,7 @@ elif page=="🏢 Company Profile":
         turn=b.number_input("Annual turnover PKR million",0.0,1000000.0,float(d.get("annual_turnover_m",0)),key="turnover_input")
         if st.form_submit_button("Save Company Profile",type="primary",use_container_width=True):
             st.session_state.company={"mode":"TEST" if mode.startswith("Test") else "REAL","company_name":name,"email":email,"pec_license":lic,"pec_category":cat,"pec_codes":codes,"province":province,"certifications":certs,"sectors":sectors,"keywords":[x.strip() for x in kw.split(",") if x.strip()],"years_experience":exp,"annual_turnover_m":turn}
-            r=save_company(st.session_state.company);st.success("Saved to Supabase." if r.get("ok") else "Saved in session; inspect Supabase connection.")
+            r=save_or_update_company(st.session_state.company);st.success("Saved to Supabase." if r.get("ok") else "Saved in session; inspect Supabase connection.")
     if st.button("Add C3 / C4 / C5 sample profiles to saved companies",use_container_width=True):
         _results=[save_or_update_company(x) for x in _sample_companies]
         if all(x.get("ok") for x in _results):st.success("Three SAMPLE profiles saved to Supabase. They remain clearly labelled SAMPLE.")
@@ -141,7 +161,7 @@ elif page=="📡 Tender Radar":
         for r in regions:st.link_button(f"Open {r} official source ↗",registry[r])
     if st.button("🔎 Search Open Sources & Match Company",type="primary"):
         with st.spinner("Reading selected public procurement sources…"):
-            found,source_health=fetch_all(regions)
+            found,source_health=fetch_all(regions," ".join(st.session_state.company.get("keywords",[])[:6]))
             # Authenticity-first fallback: if a direct parser returns zero, search the public web index
             # but accept ONLY URLs on that region's official procurement domains.
             for _region in regions:
@@ -189,7 +209,17 @@ elif page=="🧠 Agentic Analysis":
             txt=extract_text(up) if up else ""
             with st.status("Executing agents…",expanded=True) as status:
                 for x in ["Company Digital Twin","PEC Verification","Document/RAG","Eligibility","Compliance","Risk","Bid Strategy"]:st.write("✓ "+x)
-                r=run_all(st.session_state.company,t,txt);st.session_state.result=r;save_analysis(t["id"],st.session_state.company.get("company_name"),r);status.update(label="Analysis complete",state="complete")
+                r,agent_trace=run_with_trace(st.session_state.company,t,txt)
+                st.session_state.result=r
+                st.session_state.agent_trace=agent_trace
+                save_analysis(t["id"],st.session_state.company.get("company_name"),r)
+                status.update(label="Analysis complete",state="complete")
+            st.markdown("### Live Agent Activity — workflow simulation")
+            st.caption("Shows each agent's task, status, result and hand-off. It does not expose private chain-of-thought.")
+            for _step in st.session_state.agent_trace:
+                with st.expander(f"✅ {_step['agent']} • {_step['time']}",expanded=False):
+                    st.write("**Task / input:**",_step["input"])
+                    st.write("**Result / hand-off:**",_step["output"])
             a,b,c=st.columns(3);a.metric("Readiness",f"{r['eligibility']['readiness']}%");b.metric("Fit",f"{r['eligibility']['fit']}%");c.metric("Risk",r["risk"]["risk_level"])
     if st.button("Next → Compliance & Report",type="primary",use_container_width=True):go("📋 Compliance & Reports")
 

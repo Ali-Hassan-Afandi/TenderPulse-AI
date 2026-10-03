@@ -224,3 +224,18 @@ def company_matches(company_name,limit=500):
         r=requests.get(_url("matches")+f"?select=*&company_name=eq.{quote(company_name,safe='')}&order=id.desc&limit={int(limit)}",headers=_headers(),timeout=20)
         return r.json() if r.ok else []
     except:return []
+
+def selectable_companies(limit=250):
+    if not configured():return []
+    try:
+        r=requests.get(_url("companies")+f"?select=*&order=id.desc&limit={int(limit)}",headers=_headers(),timeout=20)
+        if not r.ok:return []
+        out=[];seen=set()
+        for row in r.json():
+            p=row.get("profile") if isinstance(row.get("profile"),dict) else dict(row)
+            for k in ("company_name","email","pec_license"):
+                if not p.get(k) and row.get(k):p[k]=row.get(k)
+            key=p.get("pec_license") or p.get("company_name")
+            if key and key not in seen:seen.add(key);out.append(p)
+        return out
+    except:return []
