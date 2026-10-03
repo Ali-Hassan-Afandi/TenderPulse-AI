@@ -8,20 +8,24 @@ from src.ui.components import hero,inject_v3_css,progress_header
 from src.ui.cards import tender_card
 from src.services.live_discovery import discover,source_registry
 from src.connectors.registry import fetch_all
+from src.services.official_search import search_official
 from src.services.matcher import top_matches
 from src.services.document_service import extract_text
 from src.services.email_service import send_alert
 from src.agents.pipeline import run_all
-from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent,list_tenders
+from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent,list_tenders,saved_companies,save_or_update_company,company_matches
 from src.reporting.report_builder import build_docx,build_pdf
 from src.simulation import national_simulation,yearly_company_demo
-from src.services.profile_analytics import completeness,yearly_progress,seven_day_matches
+from src.services.profile_analytics import completeness,yearly_progress,seven_day_real
 
 st.set_page_config(page_title="TenderPulse AI",page_icon="⚡",layout="wide")
 inject_v3_css();hero()
 PAGES=["🏠 Command Center","🏢 Company Profile","📡 Tender Radar","🧠 Agentic Analysis","📋 Compliance & Reports","🗄 Database Inspector"]
 def load(n):return json.loads((DATA_DIR/n).read_text())
-if "company" not in st.session_state:st.session_state.company=load("demo_company.json")
+_sample_companies=load("sample_companies.json")
+_saved=saved_companies() if health().get("ok") else []
+if "company" not in st.session_state:
+    st.session_state.company=(_saved[0] if _saved else _sample_companies[0])
 if "matches" not in st.session_state:st.session_state.matches=[]
 if "selected_tender" not in st.session_state:st.session_state.selected_tender=None
 if "page" not in st.session_state:st.session_state.page=PAGES[0]
@@ -63,8 +67,10 @@ if page=="🏠 Command Center":
     yp=yearly_progress(company)
     p2.plotly_chart(px.line(yp,x="Year",y=["Capability Index","Turnover Index","Project Index"],markers=True,title="5-Year Company Improvement — SIMULATION"),use_container_width=True)
     st.markdown("### Last 7 Days — Matching Tender Trend")
-    sd=seven_day_matches()
-    st.plotly_chart(px.bar(sd,x="Date",y="Matches",color="Category",barmode="group",title="Matched tenders by procurement category — SIMULATION"),use_container_width=True)
+    _history=company_matches(company.get("company_name"),500)
+    sd=seven_day_real(_history)
+    st.plotly_chart(px.bar(sd,x="Date",y="Matches",color="Category",barmode="group",title=f"Stored matches — {company.get('company_name')}"),use_container_width=True)
+    if not _history:st.caption("No stored match history yet for this company. Run Tender Radar/cloud sync; this chart does not invent historical matches.")
     st.markdown("### National simulation")
     nat=national_simulation();st.plotly_chart(px.bar(nat,x="Region",y=["Simulated opportunities","Matched"],barmode="group"),use_container_width=True)
     if st.button("Next → Build Company Profile",type="primary",use_container_width=True):go("🏢 Company Profile")
@@ -95,6 +101,10 @@ elif page=="🏢 Company Profile":
         if st.form_submit_button("Save Company Profile",type="primary",use_container_width=True):
             st.session_state.company={"mode":"TEST" if mode.startswith("Test") else "REAL","company_name":name,"email":email,"pec_license":lic,"pec_category":cat,"pec_codes":codes,"province":province,"certifications":certs,"sectors":sectors,"keywords":[x.strip() for x in kw.split(",") if x.strip()],"years_experience":exp,"annual_turnover_m":turn}
             r=save_company(st.session_state.company);st.success("Saved to Supabase." if r.get("ok") else "Saved in session; inspect Supabase connection.")
+    if st.button("Add C3 / C4 / C5 sample profiles to saved companies",use_container_width=True):
+        _results=[save_or_update_company(x) for x in _sample_companies]
+        if all(x.get("ok") for x in _results):st.success("Three SAMPLE profiles saved to Supabase. They remain clearly labelled SAMPLE.")
+        else:st.warning("Some sample profiles could not be saved. Check Database Inspector.")
     st.markdown("### Profile Progress")
     _pc=completeness(st.session_state.company)
     st.progress(_pc/100,text=f"{_pc}% company profile complete")
@@ -119,7 +129,17 @@ elif page=="📡 Tender Radar":
     if st.button("🔎 Search Open Sources & Match Company",type="primary"):
         with st.spinner("Reading selected public procurement sources…"):
             found,source_health=fetch_all(regions)
+            # Authenticity-first fallback: if a direct parser returns zero, search the public web index
+            # but accept ONLY URLs on that region's official procurement domains.
+            for _region in regions:
+                _h=source_health.get(_region,{})
+                if _h.get("records",0)==0:
+                    _fallback=search_official(_region," ".join(company.get("keywords",[])[:6]),30)
+                    if _fallback:
+                        found.extend(_fallback)
+                        source_health[_region]={"ok":True,"records":len(_fallback),"mode":"official-domain-search-fallback"}
         st.session_state.source_health=source_health
+        st.caption("Fallback results are labelled OFFICIAL-DOMAIN DISCOVERY and are never presented as parser-verified open tenders. Open the official source before bidding.")
         for _r,_h in source_health.items():
             if not _h.get("ok"): st.warning(f"{_r}: connector error — {_h.get('error','unknown')}")
             elif _h.get("records",0)==0: st.info(f"{_r}: public source responded, but no normalized tender records were found in this run.")

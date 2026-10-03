@@ -1,0 +1,117 @@
+[
+  {
+    "mode": "SAMPLE",
+    "company_name": "TenderPulse Sample C3 Company",
+    "email": "crp665ali@gmail.com",
+    "pec_license": "SAMPLE-C3",
+    "pec_category": "C3",
+    "pec_codes": [
+      "CE01",
+      "CE02",
+      "CE04",
+      "CE10",
+      "EE04"
+    ],
+    "province": "Punjab",
+    "city": "Multan",
+    "years_experience": 9,
+    "annual_turnover_m": 185.0,
+    "completed_projects": 31,
+    "largest_project_m": 92.0,
+    "sectors": [
+      "Civil Works",
+      "Roads",
+      "Buildings",
+      "Electrical"
+    ],
+    "certifications": [
+      "PEC Constructor Registration",
+      "NTN/FBR Registration",
+      "GST Registration",
+      "PRA Registration",
+      "ISO 9001"
+    ],
+    "keywords": [
+      "construction",
+      "civil works",
+      "road",
+      "building",
+      "electrical",
+      "rehabilitation"
+    ],
+    "note": "SAMPLE profile for testing. Replace with verified company data."
+  },
+  {
+    "mode": "SAMPLE",
+    "company_name": "TenderPulse Sample C4 Company",
+    "email": "crp665ali@gmail.com",
+    "pec_license": "SAMPLE-C4",
+    "pec_category": "C4",
+    "pec_codes": [
+      "CE01",
+      "CE04",
+      "CE10",
+      "EE04"
+    ],
+    "province": "Punjab",
+    "city": "Multan",
+    "years_experience": 6,
+    "annual_turnover_m": 95.0,
+    "completed_projects": 19,
+    "largest_project_m": 45.0,
+    "sectors": [
+      "Civil Works",
+      "Roads",
+      "Buildings"
+    ],
+    "certifications": [
+      "PEC Constructor Registration",
+      "NTN/FBR Registration",
+      "GST Registration",
+      "PRA Registration"
+    ],
+    "keywords": [
+      "construction",
+      "civil works",
+      "road",
+      "building",
+      "repair"
+    ],
+    "note": "SAMPLE profile for testing. Replace with verified company data."
+  },
+  {
+    "mode": "SAMPLE",
+    "company_name": "TenderPulse Sample C5 Company",
+    "email": "crp665ali@gmail.com",
+    "pec_license": "SAMPLE-C5",
+    "pec_category": "C5",
+    "pec_codes": [
+      "CE01",
+      "CE10",
+      "EE04"
+    ],
+    "province": "Punjab",
+    "city": "Multan",
+    "years_experience": 4,
+    "annual_turnover_m": 45.0,
+    "completed_projects": 10,
+    "largest_project_m": 18.0,
+    "sectors": [
+      "Civil Works",
+      "Buildings",
+      "Electrical"
+    ],
+    "certifications": [
+      "PEC Constructor Registration",
+      "NTN/FBR Registration",
+      "PRA Registration"
+    ],
+    "keywords": [
+      "construction",
+      "building",
+      "repair",
+      "electrical"
+    ],
+    "note": "SAMPLE profile for testing. Replace with verified company data."
+  }
+]

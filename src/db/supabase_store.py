@@ -192,3 +192,35 @@ def tender_exists_fingerprint(fingerprint):
         return r.ok and bool(r.json())
     except Exception:
         return False
+
+def saved_companies(limit=200):
+    rows=recent("companies",limit)
+    # newest record wins for a license/name
+    seen={}
+    for row in rows:
+        p=row.get("profile") or row
+        key=p.get("pec_license") or p.get("company_name")
+        if key and key not in seen:seen[key]=p
+    return list(seen.values())
+
+def save_or_update_company(company):
+    if not configured():return {"ok":False,"message":"Supabase not configured."}
+    lic=company.get("pec_license")
+    try:
+        if lic:
+            q=requests.get(_url("companies")+f"?select=id&pec_license=eq.{lic}&limit=1",headers=_headers(),timeout=15)
+            if q.ok and q.json():
+                rid=q.json()[0]["id"]
+                payload={"company_name":company.get("company_name","Unknown"),"email":company.get("email"),"pec_license":lic,"profile":company}
+                r=requests.patch(_url("companies")+f"?id=eq.{rid}",headers=_headers("return=representation"),json=payload,timeout=20)
+                return {"ok":r.ok,"status":r.status_code,"message":None if r.ok else r.text[:600]}
+        return save_company(company)
+    except Exception as e:return {"ok":False,"message":str(e)}
+
+def company_matches(company_name,limit=500):
+    if not configured() or not company_name:return []
+    try:
+        from urllib.parse import quote
+        r=requests.get(_url("matches")+f"?select=*&company_name=eq.{quote(company_name,safe='')}&order=id.desc&limit={int(limit)}",headers=_headers(),timeout=20)
+        return r.json() if r.ok else []
+    except:return []
