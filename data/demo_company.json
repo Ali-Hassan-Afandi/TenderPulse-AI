@@ -1,10 +1,13 @@
 {
+  "mode": "TEST",
   "company_name": "PakBuild Engineering (Pvt.) Ltd. \u2014 DEMO",
   "email": "tenders@pakbuild-demo.example",
   "pec_license": "12345-DEMO",
   "pec_category": "C3",
   "pec_codes": [
     "CE01",
+    "CE02",
+    "CE04",
     "CE10",
     "EE04"
   ],
@@ -12,17 +15,33 @@
   "province": "Punjab",
   "city": "Multan",
   "years_experience": 9,
-  "annual_turnover_m": 185,
+  "annual_turnover_m": 185.0,
   "employees": 74,
   "completed_projects": 31,
-  "largest_project_m": 92,
+  "largest_project_m": 92.0,
   "sectors": [
     "Civil Works",
     "Electrical",
-    "Solar"
+    "Solar",
+    "Roads",
+    "Buildings"
   ],
   "certifications": [
+    "PEC Constructor Registration",
+    "NTN/FBR Registration",
+    "GST Registration",
+    "PRA Registration",
     "ISO 9001"
   ],
-  "note": "Synthetic hackathon data. Not a real company."
+  "keywords": [
+    "construction",
+    "civil works",
+    "road",
+    "building",
+    "electrical",
+    "solar",
+    "rehabilitation",
+    "repair"
+  ],
+  "note": "Synthetic hackathon profile. Not a real company."
 }

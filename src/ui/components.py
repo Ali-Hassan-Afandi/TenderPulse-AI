@@ -13,3 +13,14 @@ def process(step):
 
 def next_action(title, detail):
     st.info(f"**AutoGuide — Next step:** {title}\n\n{detail}")
+
+def inject_v3_css():
+    import streamlit as st
+    st.markdown("""<style>
+    .block-container{padding-top:1.4rem;max-width:1450px}
+    .tp-card{background:linear-gradient(145deg,rgba(20,28,39,.96),rgba(12,18,28,.96));border:1px solid rgba(88,255,174,.18);border-radius:18px;padding:18px;margin:10px 0;box-shadow:0 12px 32px rgba(0,0,0,.16)}
+    .tp-card h3{margin:.55rem 0;color:#f5f7fa;font-size:1.08rem}.tp-row{display:flex;justify-content:space-between;align-items:center}
+    .tp-badge{font-size:.76rem;padding:5px 9px;border-radius:20px;background:rgba(92,130,255,.14)}
+    .tp-fit{font-weight:800;font-size:1.08rem;color:#65f6ae}.tp-meta,.tp-reason{font-size:.84rem;color:#aeb8c6;margin-top:8px}
+    div[data-testid="stMetric"]{background:rgba(18,27,39,.72);border:1px solid rgba(255,255,255,.08);padding:12px;border-radius:16px}
+    </style>""",unsafe_allow_html=True)

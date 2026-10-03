@@ -1,114 +1,141 @@
-import json,time
+import json
+from datetime import date
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 from src.config import DATA_DIR
-from src.ui.components import hero,next_action
+from src.ui.components import hero,inject_v3_css
+from src.ui.cards import tender_card
+from src.services.live_discovery import federal_live,source_registry
+from src.services.matcher import top_matches
 from src.services.document_service import extract_text
-from src.services.tender_sources import source_health,federal_public_preview
-from src.services.email_service import send_alert,configured as smtp_ready
+from src.services.email_service import send_alert
 from src.agents.pipeline import run_all
-from src.agents.corrigendum_agent import fingerprint
+from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent
 from src.reporting.report_builder import build_docx,build_pdf
-from src.db.supabase_store import health as db_health
 
 st.set_page_config(page_title="TenderPulse AI",page_icon="⚡",layout="wide")
-hero()
-def load(n):return json.loads((DATA_DIR/n).read_text(encoding="utf-8"))
+inject_v3_css();hero()
+def load(n):return json.loads((DATA_DIR/n).read_text())
 if "company" not in st.session_state:st.session_state.company=load("demo_company.json")
-if "tenders" not in st.session_state:st.session_state.tenders=load("demo_tenders.json")
-if "selected" not in st.session_state:st.session_state.selected=0
+if "matches" not in st.session_state:st.session_state.matches=[]
+if "selected_tender" not in st.session_state:st.session_state.selected_tender=None
+company=st.session_state.company
 
 with st.sidebar:
-    st.markdown("### ⚡ TenderPulse")
-    page=st.radio("Workspace",["Command Center","Company Twin","Tender Radar","Agentic Analysis","Compliance & Risk","Corrigendum Watch","Reports & Alerts","National Simulation"])
-    st.divider();st.caption("2026 Hackathon Build")
-    st.json(db_health(),expanded=False)
+    st.markdown("## ⚡ TenderPulse")
+    page=st.radio("Workspace",["🏠 Command Center","🏢 Company Profile","📡 Smart Tender Radar","🧠 Agentic Analysis","📋 Compliance & Reports","🗄 Database Inspector"])
+    st.divider()
+    h=health();st.caption(("🟢" if h.get("ok") else "🔴")+" Supabase "+h.get("status",""))
+    st.caption("LIVE ≠ SIMULATION. Fit ≠ award probability.")
 
-company=st.session_state.company;tender=st.session_state.tenders[st.session_state.selected]
+if page=="🏠 Command Center":
+    st.subheader("Company-Specific Procurement Command Center")
+    a,b,c,d=st.columns(4);a.metric("Matched opportunities",len(st.session_state.matches));b.metric("Company",company.get("pec_category","—"));c.metric("PEC codes",len(company.get("pec_codes",[])));d.metric("DB matches",count("matches"))
+    st.info("Start with Company Profile. Then Smart Tender Radar discovers and ranks opportunities against that profile.")
+    if st.session_state.matches:
+        st.markdown("### Top opportunities")
+        cols=st.columns(2)
+        for i,t in enumerate(st.session_state.matches[:10]):
+            with cols[i%2]:tender_card(t)
 
-if page=="Command Center":
-    st.subheader("National Procurement Intelligence Command Center")
-    c1,c2,c3,c4=st.columns(4)
-    c1.metric("Demo opportunities",len(st.session_state.tenders));c2.metric("Regions",7);c3.metric("Agents",7);c4.metric("Mode","Cloud-ready")
-    st.warning("Live public-source results, AI inference and synthetic simulation are explicitly separated. Scores are evidence-alignment indicators, not award predictions.")
-    from src.simulation import national_simulation,yearly_company_demo
-    nat=national_simulation();st.plotly_chart(px.bar(nat,x="Region",y=["Simulated opportunities","Matched"],barmode="group",title="Pakistan Opportunity Radar — SIMULATION"),use_container_width=True)
-    next_action("Build the Company Digital Twin","Review the synthetic profile, then use Tender Radar and Agentic Analysis.")
+elif page=="🏢 Company Profile":
+    st.subheader("Company Digital Twin")
+    mode=st.radio("Profile type",["Test Company (pre-filled)","Real Company"],horizontal=True)
+    if mode.startswith("Test"):
+        if st.button("Load test C3 company"):
+            st.session_state.company=load("demo_company.json");st.rerun()
+    d=st.session_state.company
+    pec_catalog=load("pec_codes.json")
+    cert_options=["PEC Constructor Registration","NTN/FBR Registration","GST Registration","PRA Registration","SRB Registration","KPRA Registration","BRA Registration","SECP Registration","ISO 9001","ISO 14001","ISO 45001","Bank/Financial Certificate","Tax Active Taxpayer Evidence","Other"]
+    with st.form("company"):
+        c1,c2=st.columns(2)
+        name=c1.text_input("Company name",d.get("company_name","") if mode.startswith("Test") else "")
+        email=c2.text_input("Tender alert email",d.get("email","") if mode.startswith("Test") else "")
+        c1,c2,c3=st.columns(3)
+        lic=c1.text_input("PEC license / registration no.",d.get("pec_license","") if mode.startswith("Test") else "")
+        cat=c2.selectbox("PEC category",["C-A","C-B","C1","C2","C3","C4","C5","C6"],index=["C-A","C-B","C1","C2","C3","C4","C5","C6"].index(d.get("pec_category","C3")))
+        province=c3.selectbox("Home province / region",["Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan","Federal","AJK","Gilgit-Baltistan"])
+        codes=st.multiselect("PEC specialization codes",list(pec_catalog),default=[x for x in d.get("pec_codes",[]) if x in pec_catalog],format_func=lambda x:f"{x} — {pec_catalog[x]}")
+        extra_codes=st.text_input("Other PEC codes (comma separated)","")
+        certs=st.multiselect("Available registrations / certificates",cert_options,default=[x for x in d.get("certifications",[]) if x in cert_options])
+        sectors=st.multiselect("Business sectors",["Civil Works","Roads","Buildings","Bridges","Water/Irrigation","Electrical","Solar","Mechanical","IT","Goods/Supplies","Consultancy"],default=[x for x in d.get("sectors",[]) if x in ["Civil Works","Roads","Buildings","Bridges","Water/Irrigation","Electrical","Solar","Mechanical","IT","Goods/Supplies","Consultancy"]])
+        keywords=st.text_input("Company capability keywords",", ".join(d.get("keywords",[])))
+        a,b,c=st.columns(3);exp=a.number_input("Experience (years)",0,80,int(d.get("years_experience",0)));turn=b.number_input("Annual turnover (PKR million)",0.0,1000000.0,float(d.get("annual_turnover_m",0)));largest=c.number_input("Largest completed project (PKR million)",0.0,1000000.0,float(d.get("largest_project_m",0)))
+        if st.form_submit_button("Save Company Profile",type="primary"):
+            allcodes=list(dict.fromkeys(codes+[x.strip().upper() for x in extra_codes.split(",") if x.strip()]))
+            st.session_state.company={"mode":"TEST" if mode.startswith("Test") else "REAL","company_name":name,"email":email,"pec_license":lic,"pec_category":cat,"pec_codes":allcodes,"province":province,"certifications":certs,"sectors":sectors,"keywords":[x.strip() for x in keywords.split(",") if x.strip()],"years_experience":exp,"annual_turnover_m":turn,"largest_project_m":largest}
+            r=save_company(st.session_state.company);st.success("Profile saved."+(" Supabase ✓" if r.get("ok") else " Session only — check Database Inspector."))
+    st.link_button("Verify firm on official PEC","https://verification.pec.org.pk/")
 
-elif page=="Company Twin":
-    st.subheader("Company Digital Twin + PEC Evidence")
-    st.caption("Synthetic data is pre-filled for the hackathon.")
-    d=company
-    with st.form("cp"):
-        name=st.text_input("Company",d["company_name"]);email=st.text_input("Alert email",d["email"])
-        a,b,c=st.columns(3);lic=a.text_input("PEC license",d["pec_license"]);cat=b.selectbox("PEC category",["C-A","C-B","C1","C2","C3","C4","C5","C6"],index=4);codes=c.text_input("PEC codes",",".join(d["pec_codes"]))
-        province=st.selectbox("Region",["Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan","Federal","AJK","Gilgit-Baltistan"])
-        exp=st.number_input("Experience years",0,50,int(d["years_experience"]));turn=st.number_input("Annual turnover PKR m",0.0,100000.0,float(d["annual_turnover_m"]))
-        if st.form_submit_button("Save Digital Twin",type="primary"):
-            d.update(company_name=name,email=email,pec_license=lic,pec_category=cat,pec_codes=[x.strip() for x in codes.split(",") if x.strip()],province=province,years_experience=exp,annual_turnover_m=turn);st.session_state.company=d;st.success("Saved.")
-    st.info("PEC's public firm-verification flow uses CAPTCHA. TenderPulse therefore requires human confirmation rather than bypassing it.")
-    st.link_button("Open official PEC Firm Verification","https://verification.pec.org.pk/")
+elif page=="📡 Smart Tender Radar":
+    st.subheader("Automatic Public Tender Discovery + Company Matching")
+    scope=st.radio("Procurement scope",["Federal","Provincial"],horizontal=True)
+    provinces=[]
+    if scope=="Provincial":
+        provinces=st.multiselect("Select province(s)",["Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan"],default=[company.get("province","Punjab")] if company.get("province") in ["Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan"] else ["Punjab"])
+    c1,c2,c3=st.columns(3);minfit=c1.slider("Minimum fit %",0,100,35,5);pages=c2.slider("Federal pages to scan",1,10,3);topn=c3.selectbox("Show top", [10,20,30],index=0)
+    scan_date=st.date_input("Tender radar date",date.today())
+    if st.button("🔎 Discover & Match Tenders",type="primary"):
+        found=[]
+        if scope=="Federal":
+            with st.spinner("Reading Federal PPRA public active tenders…"):found=federal_live(pages)
+        else:
+            st.warning("Provincial portals use different public interfaces. V3 exposes official sources and uses normalized simulation until a connector passes live parsing checks.")
+            demo=load("demo_tenders.json")
+            found=[{**x,"scope":"Provincial","province":x.get("province") or x.get("region",""),"status":"SIMULATION"} for x in demo if (not provinces or (x.get("province") or x.get("region","")) in provinces)]
+        matches=top_matches(company,found,minfit,topn);st.session_state.matches=matches
+        for t in matches:
+            save_tender(t);save_match(company,t,t["match"]["fit"],t["match"])
+        st.success(f"Scanned {len(found)} normalized records; showing {len(matches)} profile matches.")
+    if scope=="Provincial":
+        st.markdown("**Official source links**")
+        for p,u in source_registry().items():
+            if p in provinces:st.link_button(f"Open {p} procurement source",u)
+    if st.session_state.matches:
+        st.markdown(f"### Top {min(topn,len(st.session_state.matches))} matched tenders")
+        cols=st.columns(2)
+        for i,t in enumerate(st.session_state.matches[:topn]):
+            with cols[i%2]:
+                tender_card(t)
+                if st.button("Analyze this tender",key=f"a_{t['id']}_{i}"):
+                    st.session_state.selected_tender=t;st.success("Selected. Open Agentic Analysis.")
 
-elif page=="Tender Radar":
-    st.subheader("Tender Discovery Agent")
-    a,b=st.columns(2)
-    if a.button("Check Pakistan source health"):st.session_state.health=source_health()
-    if b.button("Read Federal PPRA public page"):st.session_state.fed=federal_public_preview()
-    if "health" in st.session_state:st.dataframe(pd.DataFrame(st.session_state.health),hide_index=True,use_container_width=True)
-    if "fed" in st.session_state:st.text_area("LIVE public Federal PPRA preview",st.session_state.fed["preview"],height=220)
-    st.markdown("#### Normalized opportunities — SIMULATION")
-    opts=[f"{x['id']} • {x['title']}" for x in st.session_state.tenders];choice=st.selectbox("Opportunity",opts,index=st.session_state.selected);st.session_state.selected=opts.index(choice);tender=st.session_state.tenders[st.session_state.selected]
-    st.json(tender);st.caption("Fingerprint: "+fingerprint(tender))
+elif page=="🧠 Agentic Analysis":
+    st.subheader("Evidence-Grounded Agentic Analysis")
+    t=st.session_state.selected_tender
+    if not t:st.info("Select a matched tender in Smart Tender Radar first.")
+    else:
+        tender_card(t)
+        up=st.file_uploader("Upload official tender PDF/DOCX/TXT for deep analysis",type=["pdf","docx","txt"])
+        if st.button("▶ Run Agents",type="primary"):
+            txt=extract_text(up) if up else ""
+            with st.status("Running procurement intelligence agents…",expanded=True) as status:
+                st.write("Company Digital Twin → PEC → Documents/RAG → Eligibility → Compliance → Risk → Strategy")
+                r=run_all(company,t,txt);st.session_state.result=r
+                db=save_analysis(t.get("id"),company.get("company_name"),r)
+                status.update(label="Analysis complete",state="complete")
+            a,b,c=st.columns(3);a.metric("Readiness",f"{r['eligibility']['readiness']}%");b.metric("Opportunity Fit",f"{r['eligibility']['fit']}%");c.metric("Risk",r["risk"]["risk_level"])
+            if db.get("ok"):st.toast("Saved to Supabase")
 
-elif page=="Agentic Analysis":
-    st.subheader("Live Agent Activity")
-    up=st.file_uploader("Official tender PDF/DOCX/TXT",type=["pdf","docx","txt"]);txt=extract_text(up) if up else ""
-    if st.button("▶ Run Full Agentic Workflow",type="primary"):
-        box=st.empty();events=["Company Digital Twin Agent","PEC Verification Agent","Document Intelligence Agent","Eligibility Agent","Compliance Agent","Risk Agent","Bid Strategy Agent"]
-        for i,x in enumerate(events):box.info(f"Agent {i+1}/{len(events)} — {x} running…");time.sleep(.12)
-        try:st.session_state.result=run_all(company,tender,txt);box.success("Agent workflow completed.")
-        except Exception as e:box.error(str(e))
-    if "result" in st.session_state:
-        r=st.session_state.result
-        for x in r["activity"]:st.success(f"✓ {x['agent']} — {x['status']}")
-        c1,c2,c3=st.columns(3);c1.metric("Bid Readiness",f"{r['eligibility']['readiness']}%");c2.metric("Opportunity Fit",f"{r['eligibility']['fit']}%");c3.metric("Risk",r["risk"]["risk_level"])
-        st.json(r["document"]["ai"])
-
-elif page=="Compliance & Risk":
-    st.subheader("Compliance Matrix + Risk Agent")
+elif page=="📋 Compliance & Reports":
+    st.subheader("Compliance, Report & Alert")
     if "result" not in st.session_state:st.info("Run Agentic Analysis first.")
     else:
-        r=st.session_state.result;st.dataframe(pd.DataFrame(r["compliance"]["matrix"]),hide_index=True,use_container_width=True)
-        st.metric("Open items",r["compliance"]["open_items"]);st.write("**Risk level:**",r["risk"]["risk_level"])
-        for x in r["risk"]["risks"]:st.warning(x)
-        st.write("**Bid Strategy:**",r["strategy"]["decision_support"])
-        for x in r["strategy"]["actions"]:st.write("→",x)
+        r=st.session_state.result;t=st.session_state.selected_tender
+        st.dataframe(pd.DataFrame(r["compliance"]["matrix"]),hide_index=True,use_container_width=True)
+        a,b=st.columns(2);a.download_button("Download DOCX",build_docx(company,t,r),file_name=f"{t['id']}_report.docx");b.download_button("Download PDF",build_pdf(company,t,r),file_name=f"{t['id']}_report.pdf")
+        recipient=st.text_input("Alert recipient",company.get("email",""))
+        if st.button("Send email now"):
+            ok,msg=send_alert(recipient,f"TenderPulse AI | {t['id']}",f"{t['title']}\nFit: {t['match']['fit']}%\nDeadline: {t.get('deadline')}\nRisk: {r['risk']['risk_level']}\nVerify the official tender before bidding.")
+            save_alert(t["id"],recipient,"sent" if ok else "failed");st.success(msg) if ok else st.error(msg)
+        st.info("Daily 8:00 AM delivery must run from a cloud scheduler, not the Streamlit page. See DAILY_8AM_AUTOMATION.md.")
 
-elif page=="Corrigendum Watch":
-    st.subheader("Corrigendum & Deadline Watch")
-    st.metric("Current tender fingerprint",fingerprint(tender));st.write("Deadline:",tender["deadline"])
-    st.info("Production mode stores prior fingerprints and alerts when official metadata/documents change. Federal PPRA publicly marks corrigenda; this hackathon build demonstrates the comparison architecture.")
-    st.code('old = {"deadline":"2026-10-20","security_m":1.0}\nnew = {"deadline":"2026-10-27","security_m":1.5}\n→ deadline changed; bid security changed')
-
-elif page=="Reports & Alerts":
-    st.subheader("Final Bid Intelligence Report Agent")
-    if "result" not in st.session_state:st.info("Run Agentic Analysis first.")
-    else:
-        r=st.session_state.result
-        docx=build_docx(company,tender,r);pdf=build_pdf(company,tender,r)
-        a,b=st.columns(2);a.download_button("Download DOCX Report",docx,file_name=f"{tender['id']}_TenderPulse_Report.docx");b.download_button("Download PDF Report",pdf,file_name=f"{tender['id']}_TenderPulse_Report.pdf")
-        body=f"""TenderPulse AI Alert\n\n{tender['title']}\nDeadline: {tender['deadline']}\nReadiness: {r['eligibility']['readiness']}%\nFit: {r['eligibility']['fit']}%\nRisk: {r['risk']['risk_level']}\nGaps: {', '.join(r['eligibility']['gaps']) or 'None detected'}\n\nNot an award prediction. Verify official documents."""
-        recipient=st.text_input("Company recipient",company["email"]);st.text_area("Email preview",body,height=220)
-        if st.button("Send Alert Email",type="primary"):
-            ok,msg=send_alert(recipient,f"TenderPulse AI | {tender['id']}",body);st.success(msg) if ok else st.error(msg)
-        st.caption("SMTP configured." if smtp_ready() else "Add SMTP secrets to enable real email sending.")
-
-elif page=="National Simulation":
-    st.subheader("Pakistan-wide Live Simulation")
-    st.warning("SYNTHETIC hackathon simulation — not official procurement statistics.")
-    from src.simulation import national_simulation,yearly_company_demo
-    n=national_simulation();y=yearly_company_demo()
-    st.plotly_chart(px.scatter(n,x="Simulated opportunities",y="Avg readiness",size="Matched",color="Region",title="Regional Opportunity vs Readiness — SIMULATION"),use_container_width=True)
-    st.plotly_chart(px.line(y,x="Year",y=["Bids","Qualified","Awards"],markers=True,title="Company Procurement Progress — SYNTHETIC"),use_container_width=True)
-    st.plotly_chart(px.bar(y,x="Year",y="Revenue (PKR m)",title="Yearly Procurement Revenue — SYNTHETIC"),use_container_width=True)
+elif page=="🗄 Database Inspector":
+    st.subheader("Supabase Persistence Inspector")
+    h=health();st.json(h)
+    cols=st.columns(5)
+    for c,t in zip(cols,["companies","tenders","matches","analyses","alerts"]):c.metric(t.title(),count(t))
+    table=st.selectbox("Inspect recent records",["companies","tenders","matches","analyses","alerts"])
+    rows=recent(table,10)
+    st.dataframe(pd.DataFrame(rows),use_container_width=True) if rows else st.warning("No rows found. Run/save the relevant workflow and check schema migration.")

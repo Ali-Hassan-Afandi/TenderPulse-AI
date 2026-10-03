@@ -1,0 +1,19 @@
+{
+  "CE01": "Roads & Pavements",
+  "CE02": "Bridge Structures / Piling",
+  "CE03": "Marine / Dredging / Underwater Works",
+  "CE04": "Dams / Water Retaining / Irrigation / Flood Control",
+  "CE05": "Offshore Works",
+  "CE06": "Airports",
+  "CE07": "Railways",
+  "CE08": "Tunnels",
+  "CE09": "Oil & Gas Pipelines",
+  "CE10": "General Civil Engineering Works",
+  "EE01": "Electrical Power Generation",
+  "EE02": "Electrical Power Transmission",
+  "EE03": "Electrical Power Distribution",
+  "EE04": "Low Voltage Installation",
+  "EE05": "Specialized Lighting",
+  "ME01": "Mechanical Works",
+  "ME06": "Specialized Mechanical Works"
+}
