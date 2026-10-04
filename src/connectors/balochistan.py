@@ -1,3 +1,5 @@
-from .common import generic_links
-URL="https://bppra.gob.pk/"
-def fetch():return generic_links(URL,"Balochistan","Balochistan PPRA",("tender","bid","procurement"),120)
+from .search_fallback import discover
+def fetch():
+    rows=discover("Balochistan","",60)
+    for x in rows:x["connector_mode"]="official-index"
+    return rows

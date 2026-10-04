@@ -1,6 +1,6 @@
 OFFICIAL_SOURCES={
 "Federal":{"domains":["epms.ppra.gov.pk","ppra.gov.pk"]},
-"Punjab":{"domains":["ppra.punjab.gov.pk"]},
+"Punjab":{"domains":["eproc.punjab.gov.pk","ppra.punjab.gov.pk"]},
 "Sindh":{"domains":["e.pprasindh.gov.pk","ppms.pprasindh.gov.pk","pprasindh.gov.pk"]},
 "Khyber Pakhtunkhwa":{"domains":["kppra.gov.pk","www.kppra.gov.pk"]},
 "Balochistan":{"domains":["bppra.gob.pk","www.bppra.gob.pk"]},

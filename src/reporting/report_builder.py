@@ -14,6 +14,11 @@ def build_docx(company,tender,result):
     d.add_heading("Compliance Matrix",1)
     for x in result["compliance"]["matrix"]:d.add_paragraph(f"{x.get('status')} — {x.get('requirement')}: {x.get('evidence')}")
     d.add_heading("AI Analysis",1);d.add_paragraph(_s(result["document"]["ai"].get("summary")))
+    d.add_heading("Official Source Evidence",1)
+    _se=result.get("source_evidence",{})
+    d.add_paragraph("Tender ID: "+_s(_se.get("tender_id") or tender.get("id")))
+    d.add_paragraph("Official tender URL: "+_s(_se.get("official_tender_url") or tender.get("source_url")))
+    d.add_paragraph("Official document URL: "+_s(_se.get("official_document_url") or "Not automatically resolved"))
     d.add_paragraph("Decision support only. Verify all requirements against the official tender.")
     b=BytesIO();d.save(b);return b.getvalue()
 
@@ -29,6 +34,13 @@ def build_pdf(company,tender,result):
         story.append(Paragraph(f"<b>{_s(x.get('status'))}</b> — {_s(x.get('requirement'))}<br/>{_s(x.get('evidence'))}<br/><i>{_s(x.get('action'))}</i>",body))
     story+=[Spacer(1,8),Paragraph("AI Analysis",styles["Heading2"]),Paragraph(_s(result["document"]["ai"].get("summary")) or "No AI narrative available.",body)]
     for risk in result["risk"].get("risks",[]):story.append(Paragraph("• "+_s(risk),body))
+    _se=result.get("source_evidence",{})
+    _tu=_se.get("official_tender_url") or tender.get("source_url") or ""
+    _du=_se.get("official_document_url") or ""
+    story+=[Spacer(1,8),Paragraph("Official Source Evidence",styles["Heading2"]),
+           Paragraph(f"<b>Tender ID:</b> {_s(_se.get('tender_id') or tender.get('id'))}",body)]
+    if _tu:story.append(Paragraph(f'<b>Official tender:</b> <link href="{_s(_tu)}" color="blue">{_s(_tu)}</link>',body))
+    if _du:story.append(Paragraph(f'<b>Official document:</b> <link href="{_s(_du)}" color="blue">{_s(_du)}</link>',body))
     story.append(Spacer(1,8));story.append(Paragraph("<b>Important:</b> This report is decision support, not an award prediction. Verify the official procurement documents before submission.",body))
     SimpleDocTemplate(b,pagesize=A4,rightMargin=38,leftMargin=38,topMargin=38,bottomMargin=38,title="TenderPulse AI Report").build(story)
     return b.getvalue()

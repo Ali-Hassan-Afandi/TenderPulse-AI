@@ -14,6 +14,7 @@ from src.services.document_service import extract_text
 from src.services.email_service import send_alert
 from src.agents.pipeline import run_all
 from src.agents.trace_pipeline import run_with_trace
+from src.services.tender_document import fetch_document
 from src.db.supabase_store import health,save_company,save_tender,save_match,save_analysis,save_alert,count,recent,list_tenders,saved_companies,save_or_update_company,company_matches,selectable_companies
 from src.reporting.report_builder import build_docx,build_pdf
 from src.simulation import national_simulation,yearly_company_demo
@@ -62,7 +63,7 @@ with st.sidebar:
         st.write("Groq:", "🟢 configured" if __import__("src.services.groq_service",fromlist=["available"]).available() else "🟠 not configured")
         _db=health()
         st.write("Supabase:", "🟢 connected" if _db.get("ok") else "🔴 "+str(_db.get("status")))
-        st.caption("TenderPulse V8 Functional")
+        st.caption("TenderPulse V9 Corrected")
 
 company=st.session_state.company
 def go(p):
@@ -155,7 +156,7 @@ elif page=="📡 Tender Radar":
     regions=st.multiselect("Search jurisdictions",["Federal","Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan","AJK","Gilgit-Baltistan"],default=["Federal"])
     categories=st.multiselect("Procurement category",["Works","Goods","Non-Consultancy Services","Consultancy Services","Other"],default=["Works","Goods","Non-Consultancy Services","Consultancy Services"])
     procedures=st.multiselect("Procurement procedure",["SS1E","SS2E","Other/Unspecified"],default=["SS1E","SS2E","Other/Unspecified"],help="SS1E = Single Stage–One Envelope; SS2E = Single Stage–Two Envelope.")
-    a,b,c=st.columns(3);minfit=a.slider("Minimum company fit",0,100,30,5);pages=b.slider("Federal pages",1,10,3);topn=c.selectbox("Results",[10,20,30,50])
+    a,b,c=st.columns(3);minfit=a.slider("Minimum company fit",0,100,30,5);pages=b.slider("Maximum source pages",1,10,3);topn=c.selectbox("Results",[10,20,30,50])
     registry=source_registry()
     with st.expander("Official procurement sources"):
         for r in regions:st.link_button(f"Open {r} official source ↗",registry[r])
@@ -204,22 +205,50 @@ elif page=="🧠 Agentic Analysis":
     t=st.session_state.selected_tender
     if not t:st.warning("Select a tender in Tender Radar first.")
     else:
-        tender_card(t);up=st.file_uploader("Upload official PDF/DOCX/TXT for evidence-grounded analysis",type=["pdf","docx","txt"])
+        tender_card(t)
+        st.markdown("### Tender document evidence")
+        _doc_key=f"auto_doc_{t.get('id')}"
+        if _doc_key not in st.session_state:st.session_state[_doc_key]=None
+        _c1,_c2=st.columns(2)
+        with _c1:
+            if st.button("⚡ Fetch official tender document",use_container_width=True):
+                with st.spinner("Finding and temporarily loading the official tender document…"):
+                    st.session_state[_doc_key]=fetch_document(t)
+        with _c2:
+            up=st.file_uploader("Or upload PDF/DOCX/TXT",type=["pdf","docx","txt"],label_visibility="collapsed")
+        _auto=st.session_state.get(_doc_key)
+        if _auto:
+            if _auto.get("ok"):
+                st.success(f"Official document loaded temporarily: {_auto.get('name')} • {len(_auto.get('text','')):,} characters")
+                st.link_button("Open fetched official document ↗",_auto["url"],use_container_width=True)
+            else:
+                st.warning(_auto.get("error","Official document could not be fetched automatically."))
+                if _auto.get("url"):st.link_button("Open discovered document ↗",_auto["url"])
         if st.button("▶ Run Analysis Agents",type="primary"):
-            txt=extract_text(up) if up else ""
+            txt=extract_text(up) if up else ((_auto or {}).get("text",""))
+            _doc_url=(_auto or {}).get("url") or t.get("source_url","")
             with st.status("Executing agents…",expanded=True) as status:
-                for x in ["Company Digital Twin","PEC Verification","Document/RAG","Eligibility","Compliance","Risk","Bid Strategy"]:st.write("✓ "+x)
+                for x in ["Discovery","Company Digital Twin","PEC Verification","Document Intelligence","Eligibility","Compliance","Risk","Bid Strategy","Final Report"]:st.write("✓ "+x)
                 r,agent_trace=run_with_trace(st.session_state.company,t,txt)
+                r["source_evidence"]={"tender_id":t.get("id"),"official_tender_url":t.get("source_url"),"official_document_url":_doc_url,
+                                      "document_auto_fetched":bool((_auto or {}).get("ok"))}
                 st.session_state.result=r
                 st.session_state.agent_trace=agent_trace
                 save_analysis(t["id"],st.session_state.company.get("company_name"),r)
                 status.update(label="Analysis complete",state="complete")
-            st.markdown("### Live Agent Activity — workflow simulation")
-            st.caption("Shows each agent's task, status, result and hand-off. It does not expose private chain-of-thought.")
-            for _step in st.session_state.agent_trace:
-                with st.expander(f"✅ {_step['agent']} • {_step['time']}",expanded=False):
-                    st.write("**Task / input:**",_step["input"])
-                    st.write("**Result / hand-off:**",_step["output"])
+            st.markdown("### Live Agent Activity")
+            st.caption("Evidence workflow • each card shows the agent task and concise result/hand-off.")
+            _trace=st.session_state.agent_trace
+            for _i in range(0,len(_trace),3):
+                _cols=st.columns(3)
+                for _j,_step in enumerate(_trace[_i:_i+3]):
+                    with _cols[_j]:
+                        st.markdown(f"""<div style="min-height:190px;border:1px solid #24485a;border-radius:14px;padding:16px;background:#0d1b2a">
+                        <div style="color:#36e0b2;font-weight:800">✓ {_step['agent']}</div>
+                        <div style="font-size:12px;color:#8fa6b7;margin:6px 0 12px">{_step['time']} • COMPLETE</div>
+                        <div style="font-size:12px;color:#b8c7d1"><b>TASK</b><br>{_step['task']}</div>
+                        <div style="font-size:13px;color:#ffffff;margin-top:12px"><b>RESULT</b><br>{_step['output']}</div>
+                        </div>""",unsafe_allow_html=True)
             a,b,c=st.columns(3);a.metric("Readiness",f"{r['eligibility']['readiness']}%");b.metric("Fit",f"{r['eligibility']['fit']}%");c.metric("Risk",r["risk"]["risk_level"])
     if st.button("Next → Compliance & Report",type="primary",use_container_width=True):go("📋 Compliance & Reports")
 
