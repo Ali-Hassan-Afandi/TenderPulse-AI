@@ -25,10 +25,8 @@ def _record(region,u,title,desc,engine):
 def discover(region,keywords="",limit=50):
     """Two-engine public-index fallback. Results survive only when URL host is on the official allowlist."""
     if region not in OFFICIAL_SOURCES:return []
-    domains=OFFICIAL_SOURCES[region]["domains"]
-    queries=[]
-    for domain in domains:
-        queries.extend([f"site:{domain} tender procurement bid 2026 {keywords}",f'site:{domain} "closing date" 2026 {keywords}'])
+    domain=OFFICIAL_SOURCES[region]["domains"][0]
+    queries=[f"site:{domain} tender procurement bid 2026 {keywords}",f'site:{domain} "closing date" 2026 {keywords}']
     out=[];seen=set()
     for q in queries:
         # Bing RSS is machine-readable and often works where a portal itself times out.

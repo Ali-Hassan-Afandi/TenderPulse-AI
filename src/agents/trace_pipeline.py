@@ -32,5 +32,5 @@ def run_with_trace(company,tender,document_text=""):
         elif key=="summary":
             out=f"Readiness {result.get('eligibility',{}).get('readiness','—')}% • Fit {result.get('eligibility',{}).get('fit','—')}% • Risk {result.get('risk',{}).get('risk_level','—')}"
         else:out=_compact(result.get(key) if isinstance(result,dict) else None)
-        trace.append({"agent":name,"status":"complete","time":now,"task":task,"output":out})
+        trace.append({"agent":name,"status":"complete","time":now,"task":task,"input":task,"output":out})
     return result,trace

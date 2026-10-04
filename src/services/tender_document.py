@@ -46,6 +46,12 @@ def fetch_document(tender):
             if data[:4]==b"%PDF":
                 from pypdf import PdfReader
                 reader=PdfReader(io.BytesIO(data));text="\n".join((p.extract_text() or "") for p in reader.pages[:80])
+        if not text.strip() and ("text/html" in ct or data[:32].lstrip().lower().startswith(b"<")):
+            try:
+                soup=BeautifulSoup(data.decode("utf-8","ignore"),"html.parser")
+                text="\n".join(x.strip() for x in soup.stripped_strings if x.strip())
+            except Exception:
+                pass
         return {"ok":bool(text.strip()),"url":u,"text":text[:180000],"name":name,"bytes":data,
-                "error":None if text.strip() else "Downloaded document but no extractable text was found."}
+                "error":None if text.strip() else "The official file was reached, but it has no machine-extractable text (for example, a scanned/image PDF). Upload a text-searchable copy for document-grounded analysis."}
     except Exception as e:return {"ok":False,"url":u,"text":"","name":None,"error":str(e)}

@@ -3,6 +3,7 @@ from datetime import date,timedelta
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import html
 from src.config import DATA_DIR
 from src.ui.components import hero,inject_v3_css,progress_header
 from src.ui.cards import tender_card
@@ -63,7 +64,7 @@ with st.sidebar:
         st.write("Groq:", "🟢 configured" if __import__("src.services.groq_service",fromlist=["available"]).available() else "🟠 not configured")
         _db=health()
         st.write("Supabase:", "🟢 connected" if _db.get("ok") else "🔴 "+str(_db.get("status")))
-        st.caption("TenderPulse V9 Corrected")
+        st.caption("TenderPulse V9.2 Corrected")
 
 company=st.session_state.company
 def go(p):
@@ -156,7 +157,7 @@ elif page=="📡 Tender Radar":
     regions=st.multiselect("Search jurisdictions",["Federal","Punjab","Sindh","Khyber Pakhtunkhwa","Balochistan","AJK","Gilgit-Baltistan"],default=["Federal"])
     categories=st.multiselect("Procurement category",["Works","Goods","Non-Consultancy Services","Consultancy Services","Other"],default=["Works","Goods","Non-Consultancy Services","Consultancy Services"])
     procedures=st.multiselect("Procurement procedure",["SS1E","SS2E","Other/Unspecified"],default=["SS1E","SS2E","Other/Unspecified"],help="SS1E = Single Stage–One Envelope; SS2E = Single Stage–Two Envelope.")
-    a,b,c=st.columns(3);minfit=a.slider("Minimum company fit",0,100,30,5);pages=b.slider("Maximum source pages",1,10,3);topn=c.selectbox("Results",[10,20,30,50])
+    a,b,c=st.columns(3);minfit=a.slider("Minimum company fit",0,100,30,5);pages=b.slider("Federal pages",1,10,3);topn=c.selectbox("Results",[10,20,30,50])
     registry=source_registry()
     with st.expander("Official procurement sources"):
         for r in regions:st.link_button(f"Open {r} official source ↗",registry[r])
@@ -227,6 +228,8 @@ elif page=="🧠 Agentic Analysis":
         if st.button("▶ Run Analysis Agents",type="primary"):
             txt=extract_text(up) if up else ((_auto or {}).get("text",""))
             _doc_url=(_auto or {}).get("url") or t.get("source_url","")
+            if not txt.strip():
+                st.warning("No extractable tender-document text is available. The agents will use tender metadata/source evidence only; document-specific requirements are not verified.")
             with st.status("Executing agents…",expanded=True) as status:
                 for x in ["Discovery","Company Digital Twin","PEC Verification","Document Intelligence","Eligibility","Compliance","Risk","Bid Strategy","Final Report"]:st.write("✓ "+x)
                 r,agent_trace=run_with_trace(st.session_state.company,t,txt)
@@ -243,11 +246,15 @@ elif page=="🧠 Agentic Analysis":
                 _cols=st.columns(3)
                 for _j,_step in enumerate(_trace[_i:_i+3]):
                     with _cols[_j]:
+                        _agent=html.escape(str(_step.get("agent","Agent")))
+                        _time=html.escape(str(_step.get("time","")))
+                        _task=html.escape(str(_step.get("task") or _step.get("input") or "Workflow step completed."))
+                        _output=html.escape(str(_step.get("output") or "Completed."))
                         st.markdown(f"""<div style="min-height:190px;border:1px solid #24485a;border-radius:14px;padding:16px;background:#0d1b2a">
-                        <div style="color:#36e0b2;font-weight:800">✓ {_step['agent']}</div>
-                        <div style="font-size:12px;color:#8fa6b7;margin:6px 0 12px">{_step['time']} • COMPLETE</div>
-                        <div style="font-size:12px;color:#b8c7d1"><b>TASK</b><br>{_step['task']}</div>
-                        <div style="font-size:13px;color:#ffffff;margin-top:12px"><b>RESULT</b><br>{_step['output']}</div>
+                        <div style="color:#36e0b2;font-weight:800">✓ {_agent}</div>
+                        <div style="font-size:12px;color:#8fa6b7;margin:6px 0 12px">{_time} • COMPLETE</div>
+                        <div style="font-size:12px;color:#b8c7d1"><b>TASK</b><br>{_task}</div>
+                        <div style="font-size:13px;color:#ffffff;margin-top:12px"><b>RESULT</b><br>{_output}</div>
                         </div>""",unsafe_allow_html=True)
             a,b,c=st.columns(3);a.metric("Readiness",f"{r['eligibility']['readiness']}%");b.metric("Fit",f"{r['eligibility']['fit']}%");c.metric("Risk",r["risk"]["risk_level"])
     if st.button("Next → Compliance & Report",type="primary",use_container_width=True):go("📋 Compliance & Reports")
